@@ -8,6 +8,7 @@ package cspEratosthenes
 // Eratosthenes calculates the first n prime numbers.
 func Eratosthenes(n int) (primes []int) {
 	//'n+1' as we need an additional channel to put rejected ints in.
+	var pchan = make(chan int)
 	var chans = make([]chan int, n+1)
 
 	// we need to make each chan, else they are 'nil'.
@@ -17,8 +18,11 @@ func Eratosthenes(n int) (primes []int) {
 
 	// kick off the processing logic between the channels with go routines.
 	for i := 0; i < len(chans)-1; i++ {
-		go process(chans[i], chans[i+1], &primes)
+		go process(chans[i], chans[i+1], pchan)
 	}
+
+	// accumulate the primes into the slice
+	go accumulate(pchan, &primes)
 
 	// keep putting ints into the first channel until we have a full primes slice.
 	for i := 2; len(primes) != n; i++ {
@@ -34,14 +38,20 @@ func Eratosthenes(n int) (primes []int) {
 // channel
 //
 // As per https://swtch.com/~rsc/thread/sieve.gif
-func process(left chan int, right chan int, primes *[]int) {
+func process(left chan int, right chan int, primes chan int) {
 	p := <-left
-	*primes = append(*primes, p)
+	primes <- p
 
 	for {
 		x := <-left
 		if x%p != 0 {
 			right <- x
 		}
+	}
+}
+
+func accumulate(pchan chan int, primes *[]int) {
+	for p := range pchan {
+		*primes = append(*primes, p)
 	}
 }
